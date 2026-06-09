@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>影片下載面板</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212f;
+      --muted: #667085;
+      --line: #d8dee8;
+      --panel: #ffffff;
+      --soft: #f4f7fb;
+      --blue: #2563eb;
+      --blue-strong: #1d4ed8;
+      --green: #13795b;
+      --red: #b42318;
+      --amber: #a15c07;
+      --shadow: 0 18px 55px rgba(24, 33, 47, .12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(37, 99, 235, .08), rgba(19, 121, 91, .07)),
+        var(--soft);
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 34px 0;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+      max-width: 760px;
+    }
+
+    .status-pill {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.75);
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(216, 222, 232, .9);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .panel-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    label {
+      display: block;
+      font-weight: 750;
+      margin-bottom: 10px;
+    }
+
+    textarea, input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 13px 14px;
+      font: inherit;
+      line-height: 1.5;
+      color: var(--ink);
+      background: #fbfcfe;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 118px;
+      resize: vertical;
+    }
+
+    input { min-height: 44px; }
+
+    textarea:focus, input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+    }
+
+    .two-fields {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 10px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    button, .file-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 0 14px;
+      font: inherit;
+      font-weight: 750;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    button.primary {
+      color: white;
+      background: var(--blue);
+    }
+
+    button.primary:hover { background: var(--blue-strong); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    button.secondary {
+      color: var(--ink);
+      background: white;
+      border-color: var(--line);
+    }
+
+    button.danger {
+      color: var(--red);
+      background: #fff7f5;
+      border-color: #f4cbc5;
+    }
+
+    .hint {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .hint span {
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      border-radius: 8px;
+      padding: 12px;
+      font-weight: 700;
+      color: #344054;
+      text-align: center;
+    }
+
+    .activity {
+      margin-top: 18px;
+      padding: 14px;
+      min-height: 128px;
+      border-radius: 8px;
+      background: #101828;
+      color: #e6edf7;
+      overflow: auto;
+      font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .activity strong {
+      display: block;
+      color: #ffffff;
+      margin-bottom: 7px;
+      font-family: inherit;
+    }
+
+    .message {
+      margin-top: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .message.error { color: var(--red); }
+    .message.done { color: var(--green); }
+    .message.warn { color: var(--amber); }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+    }
+
+    .item-name {
+      font-weight: 750;
+      overflow-wrap: anywhere;
+      margin-bottom: 8px;
+    }
+
+    .item-meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .item-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .file-link {
+      min-height: 36px;
+      padding: 0 12px;
+      color: var(--green);
+      background: #eaf7f2;
+      border-color: #c8eadc;
+    }
+
+    .folder {
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.6;
+      padding: 28px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    @media (max-width: 900px) {
+      main { width: min(100vw - 22px, 1180px); padding: 22px 0; }
+      header { display: block; }
+      .status-pill { margin-top: 14px; }
+      .workspace, .two-fields { grid-template-columns: 1fr; }
+      .hint { grid-template-columns: 1fr; }
+      .panel { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>影片下載面板</h1>
+        <p class="subtitle">貼單支影片可直接下載；把喜歡的帳號、頻道或公開頁面加進來源清單後，可以掃描候選影片再批次下載。</p>
+      </div>
+      <div class="status-pill">本機服務已啟動</div>
+    </header>
+
+    <section class="workspace">
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>單支影片</h2>
+          </div>
+          <label for="url">影片連結</label>
+          <textarea id="url" spellcheck="false" placeholder="https://www.instagram.com/reel/...&#10;https://youtu.be/...&#10;https://www.facebook.com/reel/..."></textarea>
+
+          <div class="toolbar">
+            <button class="primary" id="downloadBtn">開始下載</button>
+            <button class="secondary" id="pasteBtn">貼上剪貼簿</button>
+            <button class="secondary" id="clearBtn">清空</button>
+          </div>
+
+          <div class="hint" aria-label="支援平台">
+            <span>Instagram Reels</span>
+            <span>Facebook Videos</span>
+            <span>YouTube Videos</span>
+          </div>
+
+          <p class="message" id="message">公開影片通常可以直接下載；私人、限好友或需登入的影片可能會失敗。</p>
+
+          <div class="activity" id="activity">
+            <strong>任務狀態</strong>
+            尚未開始下載。
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>喜好來源</h2>
+            <button class="primary" id="scanBtn">掃描候選</button>
+          </div>
+          <div class="two-fields">
+            <div>
+              <label for="sourceLabel">名稱</label>
+              <input id="sourceLabel" placeholder="例如：喜歡的 YouTube 頻道">
+            </div>
+            <div>
+              <label for="sourceUrl">帳號 / 頻道 / 公開頁面連結</label>
+              <input id="sourceUrl" spellcheck="false" placeholder="https://www.youtube.com/@channel">
+            </div>
+          </div>
+          <div class="toolbar">
+            <button class="secondary" id="addSourceBtn">加入來源</button>
+            <button class="secondary" id="refreshSourcesBtn">重新讀取來源</button>
+          </div>
+          <p class="message warn">這裡抓的是公開來源。IG / FB 若需要登入或不是公開頁面，掃描可能會失敗。</p>
+          <div class="list" id="sources"></div>
+          <div class="activity" id="scanActivity">
+            <strong>掃描狀態</strong>
+            尚未掃描。
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>候選影片</h2>
+            <div class="toolbar" style="margin-top:0">
+              <button class="secondary" id="refreshCandidatesBtn">重新整理</button>
+              <button class="secondary" id="downloadAllBtn">下載全部</button>
+              <button class="danger" id="clearCandidatesBtn">清空</button>
+            </div>
+          </div>
+          <div class="list" id="candidates"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>下載檔案</h2>
+            <button class="secondary" id="refreshBtn">重新整理</button>
+          </div>
+          <div class="folder">儲存位置：/Users/jimlin/Documents/Codex/2026-06-07/ig-https-www-instagram-com-reel/downloads</div>
+          <div class="list" id="files"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const urlInput = document.querySelector("#url");
+    const downloadBtn = document.querySelector("#downloadBtn");
+    const pasteBtn = document.querySelector("#pasteBtn");
+    const clearBtn = document.querySelector("#clearBtn");
+    const refreshBtn = document.querySelector("#refreshBtn");
+    const message = document.querySelector("#message");
+    const activity = document.querySelector("#activity");
+    const filesEl = document.querySelector("#files");
+    const sourceLabel = document.querySelector("#sourceLabel");
+    const sourceUrl = document.querySelector("#sourceUrl");
+    const addSourceBtn = document.querySelector("#addSourceBtn");
+    const refreshSourcesBtn = document.querySelector("#refreshSourcesBtn");
+    const sourcesEl = document.querySelector("#sources");
+    const scanBtn = document.querySelector("#scanBtn");
+    const scanActivity = document.querySelector("#scanActivity");
+    const candidatesEl = document.querySelector("#candidates");
+    const refreshCandidatesBtn = document.querySelector("#refreshCandidatesBtn");
+    const downloadAllBtn = document.querySelector("#downloadAllBtn");
+    const clearCandidatesBtn = document.querySelector("#clearCandidatesBtn");
+
+    let activeJob = null;
+    let pollTimer = null;
+    let activeScan = null;
+    let scanTimer = null;
+    let cachedCandidates = [];
+
+    function formatSize(bytes) {
+      if (!bytes) return "0 B";
+      const units = ["B", "KB", "MB", "GB"];
+      let size = bytes;
+      let index = 0;
+      while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+      }
+      return `${size.toFixed(index ? 1 : 0)} ${units[index]}`;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setMessage(text, type = "") {
+      message.textContent = text;
+      message.className = `message ${type}`.trim();
+    }
+
+    function renderLog(target, title, lines) {
+      target.innerHTML = `<strong>${escapeHtml(title)}</strong>${lines.map(escapeHtml).join("<br>")}`;
+    }
+
+    function renderDownloadLog(job) {
+      const lines = job.log && job.log.length ? job.log : [job.message || "等待中..."];
+      renderLog(activity, job.status === "done" ? "下載完成" : job.status === "error" ? "下載失敗" : "下載中", lines);
+    }
+
+    function renderScanLog(scan) {
+      const lines = scan.log && scan.log.length ? scan.log : [scan.message || "等待中..."];
+      renderLog(scanActivity, scan.status === "done" ? "掃描完成" : scan.status === "error" ? "掃描失敗" : "掃描中", lines);
+    }
+
+    async function refreshFiles() {
+      const response = await fetch("/api/downloads");
+      const data = await response.json();
+      if (!data.files.length) {
+        filesEl.innerHTML = `<div class="empty">還沒有下載檔案。<br>貼上連結或下載候選影片後會列在這裡。</div>`;
+        return;
+      }
+      filesEl.innerHTML = data.files.map(file => `
+        <article class="item">
+          <div class="item-name">${escapeHtml(file.name)}</div>
+          <div class="item-meta">${formatSize(file.size)} · ${escapeHtml(file.modified)}</div>
+          <a class="file-link" href="${file.url}" download>下載 / 開啟</a>
+        </article>
+      `).join("");
+    }
+
+    async function refreshSources() {
+      const response = await fetch("/api/sources");
+      const data = await response.json();
+      if (!data.sources.length) {
+        sourcesEl.innerHTML = `<div class="empty">還沒有來源。<br>貼上你喜歡的 IG 帳號、FB 公開頁面或 YouTube 頻道。</div>`;
+        return;
+      }
+      sourcesEl.innerHTML = data.sources.map(source => `
+        <article class="item">
+          <div class="item-name">${escapeHtml(source.label)}</div>
+          <div class="item-meta">${escapeHtml(source.platform)} · ${escapeHtml(source.url)}</div>
+          <div class="item-actions">
+            <a class="file-link" href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">開啟來源</a>
+            <button class="danger" data-remove-source="${escapeHtml(source.id)}">移除</button>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    async function refreshCandidates() {
+      const response = await fetch("/api/candidates");
+      const data = await response.json();
+      cachedCandidates = data.candidates || [];
+      if (!cachedCandidates.length) {
+        candidatesEl.innerHTML = `<div class="empty">還沒有候選影片。<br>先加入喜好來源，再按「掃描候選」。</div>`;
+        return;
+      }
+      candidatesEl.innerHTML = cachedCandidates.map(item => `
+        <article class="item">
+          <div class="item-name">${escapeHtml(item.title)}</div>
+          <div class="item-meta">${escapeHtml(item.platform)} · 來源：${escapeHtml(item.source)}<br>${escapeHtml(item.url)}</div>
+          <div class="item-actions">
+            <button class="primary" data-download-candidate="${escapeHtml(item.id)}">下載</button>
+            <a class="file-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">開啟</a>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    async function pollJob(jobId) {
+      const response = await fetch(`/api/jobs/${jobId}`);
+      const data = await response.json();
+      const job = data.job;
+      activeJob = job;
+      renderDownloadLog(job);
+
+      if (job.status === "done") {
+        downloadBtn.disabled = false;
+        setMessage("下載完成，檔案已更新到右側清單。", "done");
+        clearInterval(pollTimer);
+        pollTimer = null;
+        await refreshFiles();
+        return;
+      }
+
+      if (job.status === "error") {
+        downloadBtn.disabled = false;
+        setMessage(job.message || "下載失敗。", "error");
+        clearInterval(pollTimer);
+        pollTimer = null;
+        await refreshFiles();
+      }
+    }
+
+    async function startDownload(url = urlInput.value.trim()) {
+      if (!url) {
+        setMessage("先貼上一個影片連結。", "error");
+        urlInput.focus();
+        return;
+      }
+
+      downloadBtn.disabled = true;
+      setMessage("已送出下載任務。");
+      renderLog(activity, "下載中", ["正在準備..."]);
+
+      try {
+        const response = await fetch("/api/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "下載任務建立失敗");
+        activeJob = data.job;
+        renderDownloadLog(activeJob);
+        clearInterval(pollTimer);
+        pollTimer = setInterval(() => pollJob(activeJob.id), 1200);
+        await pollJob(activeJob.id);
+      } catch (error) {
+        downloadBtn.disabled = false;
+        setMessage(error.message, "error");
+        renderLog(activity, "下載失敗", [error.message]);
+      }
+    }
+
+    async function addSource() {
+      const url = sourceUrl.value.trim();
+      if (!url) {
+        sourceUrl.focus();
+        renderLog(scanActivity, "來源未加入", ["請先貼上帳號、頻道或公開頁面連結。"]);
+        return;
+      }
+      const response = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, label: sourceLabel.value.trim() })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        renderLog(scanActivity, "來源未加入", [data.error || "加入失敗"]);
+        return;
+      }
+      sourceLabel.value = "";
+      sourceUrl.value = "";
+      renderLog(scanActivity, "來源已加入", [`${data.source.label} · ${data.source.platform}`]);
+      await refreshSources();
+    }
+
+    async function removeSource(id) {
+      await fetch("/api/sources/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      await refreshSources();
+    }
+
+    async function pollScan(scanId) {
+      const response = await fetch(`/api/scans/${scanId}`);
+      const data = await response.json();
+      const scan = data.scan;
+      activeScan = scan;
+      renderScanLog(scan);
+
+      if (scan.status === "done" || scan.status === "error") {
+        scanBtn.disabled = false;
+        clearInterval(scanTimer);
+        scanTimer = null;
+        await refreshCandidates();
+      }
+    }
+
+    async function startScan() {
+      scanBtn.disabled = true;
+      renderLog(scanActivity, "掃描中", ["正在啟動掃描..."]);
+      const response = await fetch("/api/scan", { method: "POST" });
+      const data = await response.json();
+      activeScan = data.scan;
+      renderScanLog(activeScan);
+      clearInterval(scanTimer);
+      scanTimer = setInterval(() => pollScan(activeScan.id), 1500);
+      await pollScan(activeScan.id);
+    }
+
+    async function clearCandidates() {
+      await fetch("/api/candidates/clear", { method: "POST" });
+      await refreshCandidates();
+      renderLog(scanActivity, "候選已清空", ["候選清單已清空。"]);
+    }
+
+    async function downloadAllCandidates() {
+      if (!cachedCandidates.length) {
+        renderLog(activity, "沒有候選影片", ["先掃描候選影片。"]);
+        return;
+      }
+      for (const item of cachedCandidates) {
+        await startDownload(item.url);
+      }
+    }
+
+    downloadBtn.addEventListener("click", () => startDownload());
+    urlInput.addEventListener("keydown", event => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") startDownload();
+    });
+
+    pasteBtn.addEventListener("click", async () => {
+      try {
+        urlInput.value = await navigator.clipboard.readText();
+        urlInput.focus();
+        setMessage("已貼上剪貼簿內容。");
+      } catch {
+        setMessage("瀏覽器不允許直接讀取剪貼簿，可以手動貼上。", "error");
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      urlInput.value = "";
+      urlInput.focus();
+      setMessage("已清空輸入欄。");
+    });
+
+    addSourceBtn.addEventListener("click", addSource);
+    refreshSourcesBtn.addEventListener("click", refreshSources);
+    scanBtn.addEventListener("click", startScan);
+    refreshCandidatesBtn.addEventListener("click", refreshCandidates);
+    clearCandidatesBtn.addEventListener("click", clearCandidates);
+    downloadAllBtn.addEventListener("click", downloadAllCandidates);
+    refreshBtn.addEventListener("click", refreshFiles);
+
+    sourcesEl.addEventListener("click", event => {
+      const id = event.target?.dataset?.removeSource;
+      if (id) removeSource(id);
+    });
+
+    candidatesEl.addEventListener("click", event => {
+      const id = event.target?.dataset?.downloadCandidate;
+      if (!id) return;
+      const item = cachedCandidates.find(candidate => candidate.id === id);
+      if (item) startDownload(item.url);
+    });
+
+    refreshFiles();
+    refreshSources();
+    refreshCandidates();
+  </script>
+</body>
+</html>
