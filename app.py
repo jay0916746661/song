@@ -17,7 +17,7 @@ DOWNLOADS = ROOT / "downloads"
 SOURCES_FILE = ROOT / "sources.json"
 CANDIDATES_FILE = ROOT / "candidates.json"
 PYTHON = ROOT / ".venv" / "bin" / "python"
-HOST = "127.0.0.1"
+HOST = os.environ.get("HOST", "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8787"))
 
 JOBS = {}
