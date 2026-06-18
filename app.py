@@ -84,6 +84,11 @@ def detect_platform(url):
     return "其他"
 
 
+def is_youtube_url(url):
+    host = urlparse(url).netloc.lower()
+    return "youtube.com" in host or "youtu.be" in host
+
+
 def safe_download_path(name):
     candidate = (DOWNLOADS / name).resolve()
     if DOWNLOADS.resolve() not in candidate.parents and candidate != DOWNLOADS.resolve():
@@ -266,6 +271,8 @@ def build_download_command(url, output_format):
     ]
     if ffmpeg_path:
         base.extend(["--ffmpeg-location", ffmpeg_path])
+    if is_youtube_url(url):
+        base.extend(["--extractor-args", "youtube:player_client=default,ios"])
     if output_format == "video":
         return base + [
             "-o",
@@ -335,7 +342,18 @@ def run_download(job_id, url, output_format):
                 JOBS[job_id]["message"] = "下載完成"
             else:
                 JOBS[job_id]["status"] = "error"
-                JOBS[job_id]["message"] = "下載失敗，可能需要登入、影片不是公開，或平台限制下載。"
+                detail = next(
+                    (
+                        item
+                        for item in reversed(lines)
+                        if "ERROR:" in item or "Sign in" in item or "unavailable" in item.lower()
+                    ),
+                    lines[-1] if lines else "",
+                )
+                if detail:
+                    JOBS[job_id]["message"] = f"下載失敗：{detail}"
+                else:
+                    JOBS[job_id]["message"] = "下載失敗，可能需要登入、影片不是公開，或平台限制下載。"
     except Exception as exc:
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "error"
