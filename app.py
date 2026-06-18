@@ -2,7 +2,9 @@
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -16,7 +18,8 @@ ROOT = Path(__file__).resolve().parent
 DOWNLOADS = ROOT / "downloads"
 SOURCES_FILE = ROOT / "sources.json"
 CANDIDATES_FILE = ROOT / "candidates.json"
-PYTHON = ROOT / ".venv" / "bin" / "python"
+LOCAL_PYTHON = ROOT / ".venv" / "bin" / "python"
+PYTHON = os.environ.get("PYTHON_BIN") or str(LOCAL_PYTHON if LOCAL_PYTHON.exists() else Path(sys.executable))
 HOST = os.environ.get("HOST", "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8787"))
 
@@ -25,6 +28,8 @@ SCAN_JOBS = {}
 JOBS_LOCK = threading.Lock()
 URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 SUPPORTED_HINTS = ("instagram.com", "facebook.com", "fb.watch", "youtube.com", "youtu.be")
+OUTPUT_FORMATS = {"video", "mp3", "wav"}
+FFMPEG_PATH = None
 
 
 def now():
@@ -102,6 +107,43 @@ def list_downloads():
             }
         )
     return files
+
+
+def normalize_output_format(value):
+    output_format = (value or "video").strip().lower()
+    if output_format not in OUTPUT_FORMATS:
+        return "video"
+    return output_format
+
+
+def get_ffmpeg_path():
+    global FFMPEG_PATH
+    if FFMPEG_PATH:
+        return FFMPEG_PATH
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        FFMPEG_PATH = system_ffmpeg
+        return FFMPEG_PATH
+    try:
+        process = subprocess.run(
+            [
+                str(PYTHON),
+                "-c",
+                "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())",
+            ],
+            cwd=str(ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=10,
+        )
+        candidate = process.stdout.strip()
+        if process.returncode == 0 and candidate and Path(candidate).exists():
+            FFMPEG_PATH = candidate
+            return FFMPEG_PATH
+    except Exception:
+        return None
+    return None
 
 
 def normalize_candidate_url(info, source_url):
@@ -210,9 +252,9 @@ def run_scan(scan_id):
         SCAN_JOBS[scan_id]["finished_at"] = now()
 
 
-def run_download(job_id, url):
-    DOWNLOADS.mkdir(exist_ok=True)
-    command = [
+def build_download_command(url, output_format):
+    ffmpeg_path = get_ffmpeg_path()
+    base = [
         str(PYTHON),
         "-m",
         "yt_dlp",
@@ -221,14 +263,42 @@ def run_download(job_id, url):
         "--restrict-filenames",
         "--trim-filenames",
         "120",
+    ]
+    if ffmpeg_path:
+        base.extend(["--ffmpeg-location", ffmpeg_path])
+    if output_format == "video":
+        return base + [
+            "-o",
+            str(DOWNLOADS / "%(extractor)s_%(id)s_%(title).80B.%(ext)s"),
+            url,
+        ]
+    return base + [
+        "--extract-audio",
+        "--audio-format",
+        output_format,
+        "--audio-quality",
+        "0",
         "-o",
         str(DOWNLOADS / "%(extractor)s_%(id)s_%(title).80B.%(ext)s"),
         url,
     ]
 
+
+def run_download(job_id, url, output_format):
+    DOWNLOADS.mkdir(exist_ok=True)
+    if output_format in {"mp3", "wav"} and not get_ffmpeg_path():
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = "MP3/WAV 轉檔需要 ffmpeg。請先安裝相依套件，或改選影片檔。"
+            JOBS[job_id]["log"] = ["找不到 ffmpeg 或 imageio-ffmpeg，因此無法抽取音訊或轉成 MP3/WAV。"]
+            JOBS[job_id]["finished_at"] = now()
+        return
+
+    command = build_download_command(url, output_format)
+
     with JOBS_LOCK:
         JOBS[job_id]["status"] = "running"
-        JOBS[job_id]["message"] = "正在連線..."
+        JOBS[job_id]["message"] = f"正在下載 {output_format.upper() if output_format != 'video' else '影片'}..."
         JOBS[job_id]["command"] = " ".join(command)
 
     try:
@@ -380,6 +450,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             payload = self.read_json()
             url = (payload.get("url") or "").strip()
+            output_format = normalize_output_format(payload.get("format"))
             if not URL_RE.match(url):
                 return self.send_json({"error": "請貼上 http 或 https 影片連結"}, HTTPStatus.BAD_REQUEST)
             host = urlparse(url).netloc.lower()
@@ -391,6 +462,7 @@ class Handler(SimpleHTTPRequestHandler):
             job = {
                 "id": job_id,
                 "url": url,
+                "format": output_format,
                 "status": "queued",
                 "message": hint,
                 "log": [],
@@ -400,7 +472,7 @@ class Handler(SimpleHTTPRequestHandler):
             }
             with JOBS_LOCK:
                 JOBS[job_id] = job
-            thread = threading.Thread(target=run_download, args=(job_id, url), daemon=True)
+            thread = threading.Thread(target=run_download, args=(job_id, url, output_format), daemon=True)
             thread.start()
             return self.send_json({"job": public_job(job)}, HTTPStatus.ACCEPTED)
         except json.JSONDecodeError:
@@ -409,7 +481,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     DOWNLOADS.mkdir(exist_ok=True)
-    if not PYTHON.exists():
+    if not Path(PYTHON).exists():
         raise SystemExit(f"Missing yt-dlp environment: {PYTHON}")
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Video panel running at http://{HOST}:{PORT}")

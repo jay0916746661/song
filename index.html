@@ -204,6 +204,45 @@
       text-align: center;
     }
 
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .format-option {
+      position: relative;
+      display: block;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .format-option input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .format-option span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      color: #344054;
+      font-weight: 750;
+    }
+
+    .format-option input:checked + span {
+      border-color: var(--blue);
+      background: rgba(37, 99, 235, .1);
+      color: var(--blue-strong);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, .08);
+    }
+
     .activity {
       margin-top: 18px;
       padding: 14px;
@@ -295,7 +334,7 @@
       header { display: block; }
       .status-pill { margin-top: 14px; }
       .workspace, .two-fields { grid-template-columns: 1fr; }
-      .hint { grid-template-columns: 1fr; }
+      .hint, .format-grid { grid-template-columns: 1fr; }
       .panel { padding: 16px; }
     }
   </style>
@@ -319,6 +358,22 @@
           <label for="url">影片連結</label>
           <textarea id="url" spellcheck="false" placeholder="https://www.instagram.com/reel/...&#10;https://youtu.be/...&#10;https://www.facebook.com/reel/..."></textarea>
 
+          <label style="margin-top:14px">輸出格式</label>
+          <div class="format-grid" role="radiogroup" aria-label="輸出格式">
+            <label class="format-option">
+              <input type="radio" name="format" value="video" checked>
+              <span>影片檔</span>
+            </label>
+            <label class="format-option">
+              <input type="radio" name="format" value="mp3">
+              <span>MP3</span>
+            </label>
+            <label class="format-option">
+              <input type="radio" name="format" value="wav">
+              <span>WAV</span>
+            </label>
+          </div>
+
           <div class="toolbar">
             <button class="primary" id="downloadBtn">開始下載</button>
             <button class="secondary" id="pasteBtn">貼上剪貼簿</button>
@@ -331,7 +386,7 @@
             <span>YouTube Videos</span>
           </div>
 
-          <p class="message" id="message">公開影片通常可以直接下載；私人、限好友或需登入的影片可能會失敗。</p>
+          <p class="message" id="message">公開影片通常可以直接下載；MP3/WAV 需要本機有 ffmpeg 才能轉檔。</p>
 
           <div class="activity" id="activity">
             <strong>任務狀態</strong>
@@ -401,6 +456,7 @@
     const message = document.querySelector("#message");
     const activity = document.querySelector("#activity");
     const filesEl = document.querySelector("#files");
+    const formatInputs = [...document.querySelectorAll('input[name="format"]')];
     const sourceLabel = document.querySelector("#sourceLabel");
     const sourceUrl = document.querySelector("#sourceUrl");
     const addSourceBtn = document.querySelector("#addSourceBtn");
@@ -443,6 +499,16 @@
     function setMessage(text, type = "") {
       message.textContent = text;
       message.className = `message ${type}`.trim();
+    }
+
+    function selectedFormat() {
+      return formatInputs.find(input => input.checked)?.value || "video";
+    }
+
+    function formatLabel(value) {
+      if (value === "mp3") return "MP3";
+      if (value === "wav") return "WAV";
+      return "影片檔";
     }
 
     function renderLog(target, title, lines) {
@@ -539,7 +605,7 @@
       }
     }
 
-    async function startDownload(url = urlInput.value.trim()) {
+    async function startDownload(url = urlInput.value.trim(), outputFormat = selectedFormat()) {
       if (!url) {
         setMessage("先貼上一個影片連結。", "error");
         urlInput.focus();
@@ -547,14 +613,14 @@
       }
 
       downloadBtn.disabled = true;
-      setMessage("已送出下載任務。");
-      renderLog(activity, "下載中", ["正在準備..."]);
+      setMessage(`已送出 ${formatLabel(outputFormat)} 下載任務。`);
+      renderLog(activity, "下載中", [`正在準備 ${formatLabel(outputFormat)}...`]);
 
       try {
         const response = await fetch("/api/download", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url, format: outputFormat })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "下載任務建立失敗");
@@ -641,7 +707,7 @@
         return;
       }
       for (const item of cachedCandidates) {
-        await startDownload(item.url);
+        await startDownload(item.url, selectedFormat());
       }
     }
 
